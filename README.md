@@ -1,4 +1,4 @@
-# Training and Inference for Integer-based Semantic Segmentation Network
+# NOBN
 This repository is still under cosntruction, use the code at your own risk!
 ### Overview
 
