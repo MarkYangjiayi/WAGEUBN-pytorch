@@ -1,73 +1,151 @@
 import torch
 import torch.nn as nn
+from torch.autograd import Function
 
-bitsW = 8
-bitsA = 8
-bitsE = 8
-bitsG = 8
-bitsU = 24
+bitsW = 32
+bitsA = 32
+bitsE = 32
+bitsG = 32
+bitsU = 32
+
+# bitsW = 8
+# bitsA = 8
+# bitsE = 8
+# bitsG = 8
+# bitsU = 24
 
 def scale(x):
-    result = 2.**torch.round(torch.log2(x))
+    scale = torch.max(torch.abs(x))
+    result = 2.**torch.round(torch.log2(scale))
     return result
 
-def del(bits):
+def delta(bits):
     result = (2.**(1-bits))
     return result
 
 def clip(x, bits):
     if bits >= 32:
-        delta = 0
+        step = 0
     else:
-        delta = del(bits)
-    ceil  = 1 - delta
-    floor = delta - 1
+        step = delta(bits)
+    ceil  = 1 - step
+    floor = step - 1
     result = torch.clamp(x, floor, ceil)
     return result
 
-def Q(x, bits):
+def quant(x, bits):
     if bits >= 32:
         result = x
     else:
-        result = torch.round(x/del(bits))*del(bits)
+        result = torch.round(x/delta(bits))*delta(bits)
     return result
 
-def QW(x):
+def qw(x):
     bits = bitsW
     if bits >= 32:
         result = x
     else:
-        result = clip(Q(x,bits),bits)
-    return
+        result = clip(quant(x,bits),bits)
+    return result
 
-def QA(x):
+def qa(x):
     bits = bitsA
     if bits >= 32:
         result = x
     else:
-        result = clip(Q(x,bits),bits)
-    return
+        result = quant(x,bits)
+    return result
 
-def QE(x):
+def qe(x):
     bits = bitsE
     if bits >= 32:
         result = x
     else:
-        result = clip(Q(x,bits),bits)
-    return
+        dscale = scale(x)
+        result = dscale*clip(quant(x/dscale,bits),bits)
+    return result
 
-def QG(x):
+def qg(x):
     bits = bitsG
     if bits >= 32:
         result = x
     else:
-        result = clip(Q(x,bits),bits)
-    return
+        dscale = scale(x)
+        x = x / dscale
+        factor = 128
+        bitsR = 32
+        norm = quant(factor * x, bitsR)
 
-def QU(x):
+        norm_sign = torch.sign(norm)
+        norm_abs = torch.abs(norm)
+        norm_int = torch.floor(norm_abs)
+        norm_float = norm_abs - norm_int
+        rand_float = torch.FloatTensor(*x.size()).uniform_()
+        norm = norm_sign * ( norm_int + 0.5 * (torch.sign(norm_float - rand_float) + 1) )
+        norm = torch.clamp(norm,-factor+1,factor-1)
+        result = quant(norm*delta(bits)/128,15)
+
+        # dscale = scale(x)
+        # x = x / dscale
+        # factor = 128
+        # bitsR = 32
+        # norm = Q(factor * x, btisR)
+        #
+        # norm_sign = torch.sign(norm)
+        # norm_abs = torch.abs(norm)
+        # norm_int = torch.floor(norm_abs)
+        # norm_float = norm_abs - norm_int
+        # rand_float = torch.cuda.FloatTensor(*x.size()).uniform_()
+        # norm = norm_sign * ( norm_int + 0.5 * (torch.sign(norm_float - rand_float) + 1) )
+        # norm = tf.clip_by_value(norm,-factor+1,factor-1)
+        # result = norm * dscale / factor
+    return result
+
+def qu(x):
     bits = bitsU
     if bits >= 32:
         result = x
     else:
-        result = clip(Q(x,bits),bits)
-    return
+        result = clip(quant(x,bits),bits)
+    return result
+
+class QW(Function):
+    @staticmethod
+    def forward(self, x):
+        result = qw(x)
+        return result
+
+    @staticmethod
+    def backward(self, grad_output):
+        grad_input = grad_output
+        return grad_input
+quantizeW = QW().apply
+
+class QAE(Function):
+    @staticmethod
+    def forward(self, x):
+        self.save_for_backward(x)
+        result = qa(x)
+        return result
+
+    @staticmethod
+    def backward(self, grad_output):
+        if self.needs_input_grad[0]:
+            grad_input = qe(grad_output)
+        else:
+            grad_input = grad_output
+        return grad_input, None, None, None
+quantizeAE = QAE.apply
+
+import numpy as np
+np.random.seed(10)
+shape = (5,5)
+test_data = np.random.rand(*shape)
+test_tensor = torch.from_numpy(test_data).float()
+test_tensorb = torch.from_numpy(test_data).float()
+print(test_tensor)
+test_tensor = test_tensor.mul_(2)
+print(test_tensor)
+# result = qg(test_tensor)
+# print(test_tensor)
+# print(result)
