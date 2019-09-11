@@ -1,7 +1,7 @@
-# NOBN
-This repository is still under cosntruction, use the code at your own risk!
+# WAGEUBN-pytorch
+***This repository is still under cosntruction, use the code at your own risk!***
 ### Overview
-
+This is a pytorch implementation on [WAGEUBN](https://arxiv.org/pdf/1909.02384.pdf)
 ### Table of contents
 <!-- 1. [About EfficientNet](#about-efficientnet)
 2. [About EfficientNet-PyTorch](#about-efficientnet-pytorch)
