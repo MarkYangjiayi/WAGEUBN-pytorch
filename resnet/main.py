@@ -236,10 +236,10 @@ def main_worker(gpu, ngpus_per_node, args):
         validate(val_loader, model, criterion, args)
         return
 
-    #quantize weights before training:
+    #*quantize weights before training:
     for name, param in model.named_parameters():
         print(name)
-        if grad_and_var[1].name.find('BatchNorm')>-1:
+        if name.find('conv')>-1:
             param.data = qu(param.data)
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -397,7 +397,7 @@ class ProgressMeter(object):
     def display(self, batch):
         entries = [self.prefix + self.batch_fmtstr.format(batch)]
         entries += [str(meter) for meter in self.meters]
-        print('\t'.join(entries))
+        print(' '.join(entries))
 
     def _get_batch_fmtstr(self, num_batches):
         num_digits = len(str(num_batches // 1))

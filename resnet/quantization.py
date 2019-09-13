@@ -134,7 +134,7 @@ class QAE(Function):
             grad_input = qe(grad_output)
         else:
             grad_input = grad_output
-        return grad_input, None, None, None
+        return grad_input
 quantizeAE = QAE.apply
 
 import numpy as np
