@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 from torch.autograd import Function
 
-bitsW = 32
-bitsA = 32
-bitsE = 32
-bitsG = 32
-bitsU = 32
+bitsW = 8
+bitsA = 8
+bitsE = 8
+bitsG = 8
+bitsU = 16
 
 # bitsW = 8
 # bitsA = 8
@@ -70,6 +70,21 @@ def qg(x):
     if bits >= 32:
         result = x
     else:
+        # dscale = scale(x)
+        # x = x / dscale
+        # factor = 128
+        # bitsR = 32
+        # norm = quant(factor * x, bitsR)
+        #
+        # norm_sign = torch.sign(norm)
+        # norm_abs = torch.abs(norm)
+        # norm_int = torch.floor(norm_abs)
+        # norm_float = norm_abs - norm_int
+        # rand_float = torch.FloatTensor(*x.size()).uniform_()
+        # norm = norm_sign * ( norm_int + 0.5 * (torch.sign(norm_float - rand_float) + 1) )
+        # norm = torch.clamp(norm,-factor+1,factor-1)
+        # result = quant(norm*delta(bits)/128,15)
+
         dscale = scale(x)
         x = x / dscale
         factor = 128
@@ -83,22 +98,8 @@ def qg(x):
         rand_float = torch.FloatTensor(*x.size()).uniform_()
         norm = norm_sign * ( norm_int + 0.5 * (torch.sign(norm_float - rand_float) + 1) )
         norm = torch.clamp(norm,-factor+1,factor-1)
-        result = quant(norm*delta(bits)/128,15)
+        result = norm/128
 
-        # dscale = scale(x)
-        # x = x / dscale
-        # factor = 128
-        # bitsR = 32
-        # norm = Q(factor * x, btisR)
-        #
-        # norm_sign = torch.sign(norm)
-        # norm_abs = torch.abs(norm)
-        # norm_int = torch.floor(norm_abs)
-        # norm_float = norm_abs - norm_int
-        # rand_float = torch.cuda.FloatTensor(*x.size()).uniform_()
-        # norm = norm_sign * ( norm_int + 0.5 * (torch.sign(norm_float - rand_float) + 1) )
-        # norm = tf.clip_by_value(norm,-factor+1,factor-1)
-        # result = norm * dscale / factor
     return result
 
 def qu(x):
@@ -142,10 +143,6 @@ np.random.seed(10)
 shape = (5,5)
 test_data = np.random.rand(*shape)
 test_tensor = torch.from_numpy(test_data).float()
-test_tensorb = torch.from_numpy(test_data).float()
+result = qg(test_tensor)
 print(test_tensor)
-test_tensor = test_tensor.mul_(2)
-print(test_tensor)
-# result = qg(test_tensor)
-# print(test_tensor)
-# print(result)
+print(result)
