@@ -241,6 +241,7 @@ def main_worker(gpu, ngpus_per_node, args):
         print(name)
         if name.find('conv')>-1:
             param.data = qu(param.data)
+    print("Weights quantized...")
 
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
